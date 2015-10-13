@@ -54,33 +54,33 @@ def initialize() {
 	runEvery1Hour(updateHeatTape)	
 }
 
-
-def updateHeatTape() {
-    log.debug "updateHeatTape"  
-    
-    if (state.snowOnRoof == null){
+def setupInitialConditions(){
+   if (state.snowOnRoof == null){
     	state.snowOnRoof = false 
     } 
     
     if(state.melt_point_score_since_snow == null){
     	state.melt_point_score_since_snow = 0
     }
+}
+
+def updateHeatTape() {
+    log.debug "updateHeatTape"  
+    
+ 	setupInitialConditions()
        
     Map currentConditions =  getWeatherFeature("conditions" , zipcode)
     
-    log.debug "zipcode:" + zipcode
-    
-   
    	//currentConditions.current_observation.each { k ,v -> log.debug(k + ": " + v) }
 
 	recordWeatherStats(currentConditions.current_observation)
-    
-   
+
+   	log.debug "zipcode:" + zipcode
     log.debug "aboveMeltTemperature:" + state.aboveMeltTemperature
     log.debug "----melt_point_score_since_snow:" + state.melt_point_score_since_snow
     
  
-    state.snowOnRoof = (state.melt_point_score_since_snow < 504 )
+    state.snowOnRoof = (state.melt_point_score_since_snow < 0 )
     
     log.debug "snowOnRoof:" + state.snowOnRoof
     
@@ -88,44 +88,96 @@ def updateHeatTape() {
    
 }
 
+def caculateNewSnow(observation){
+
+	if( !( isSnowing(observation) )){
+		return;
+    }
+
+    if( observation.precip_1hr_metric > 40 ){
+        state.melt_point_score_since_snow = -150 + state.melt_point_score_since_snow  
+    }else if( observation.precip_1hr_metric > 30 ){
+        state.melt_point_score_since_snow = -100 + state.melt_point_score_since_snow  
+    } else if(observation.precip_1hr_metric > 25 ){
+        state.melt_point_score_since_snow = -60 + state.melt_point_score_since_snow 
+    } else if( observation.precip_1hr_metric > 10 ){
+        state.melt_point_score_since_snow = -30 + state.melt_point_score_since_snow 
+    } else if( observation.precip_1hr_metric > 5 ){
+        state.melt_point_score_since_snow = -4 + state.melt_point_score_since_snow 
+    } else if( observation.precip_1hr_metric > 3 ){
+        state.melt_point_score_since_snow = -2 + state.melt_point_score_since_snow  
+    } else if( observation.precip_1hr_metric > 0 ){
+        state.melt_point_score_since_snow = -1 + state.melt_point_score_since_snow  
+    }
+    
+    if(state.melt_point_score_since_snow < -550){
+    	// Max out as snow at this stage will either be falling off the roof or the property getting damaged
+    	state.melt_point_score_since_snow = -550 	
+    }
+    
+}
+
 def calculateSnowMeltScore(observation){
-        if( observation.temp_c > 20 ){
-        	state.melt_point_score_since_snow = 100 + state.melt_point_score_since_snow  
-        } else if(observation.temp_c > 15 ){
-        	state.melt_point_score_since_snow = 70 + state.melt_point_score_since_snow 
-        } else if( observation.temp_c > 10 ){
-        	state.melt_point_score_since_snow = 50 + state.melt_point_score_since_snow 
-        } else if( observation.temp_c > 5 ){
-        	state.melt_point_score_since_snow = 4 + state.melt_point_score_since_snow 
-        } else if( observation.temp_c > 0 ){
-        	state.melt_point_score_since_snow = 2 + state.melt_point_score_since_snow  
-        } else if( observation.temp_c > -3 ){
-        	state.melt_point_score_since_snow = 1 + state.melt_point_score_since_snow  
-        }
+    if( observation.temp_c > 20 ){
+        state.melt_point_score_since_snow = 100 + state.melt_point_score_since_snow  
+    } else if(observation.temp_c > 15 ){
+        state.melt_point_score_since_snow = 70 + state.melt_point_score_since_snow 
+    } else if( observation.temp_c > 10 ){
+        state.melt_point_score_since_snow = 50 + state.melt_point_score_since_snow 
+    } else if( observation.temp_c > 5 ){
+        state.melt_point_score_since_snow = 4 + state.melt_point_score_since_snow 
+    } else if( observation.temp_c > 0 ){
+        state.melt_point_score_since_snow = 2 + state.melt_point_score_since_snow  
+    } else if( observation.temp_c > -3 ){
+        state.melt_point_score_since_snow = 1 + state.melt_point_score_since_snow  
+    }
+
+    if(state.melt_point_score_since_snow > 10){
+        // No more snow to melt
+        state.melt_point_score_since_snow = 0
+    }   
+}
+
+def isSnowing(observation){
+	return isFreezing(observation) && observation.precip_1hr_metric > 0
+}
+
+def isFreezing(observation){
+	return observation.temp_c < 0
+}
+
+def isMelting(observation){
+	return observation.temp_c > -3
+}
+
+def isRaining(observation){
+	return observation.precip_today_metric > 0 && ! isFreezing(observation)
 }
 
 def recordWeatherStats(observation){
 	log.debug "temp_c:" + observation.temp_c
-	if( observation.temp_c < 0){
+	if( isFreezing(observation)){
 		state.lastFreeze = new Date()
     }
     log.debug "lastFreeze:" + state.lastFreeze
 
-    log.debug "precip_today_metric:" + observation.precip_today_metric
-    if( observation.precip_today_metric > 0){
+    log.debug "precip_1hr_metric:" + observation.precip_1hr_metric
+    if( isRaining(observation) ){
 		state.lastPrecipitation = new Date()
     }
     log.debug "lastPrecipitation:" + state.lastPrecipitation
     
-    if( observation.precip_today_metric > 0 && observation.temp_c < 0 ){
-		state.lastFreezingPrecipitation = new Date()
-        state.melt_point_score_since_snow = 0;
+    if( isSnowing(observation) ){
+		//state.lastFreezingPrecipitation = new Date()
+        //state.melt_point_score_since_snow = 0;
     }
     log.debug "lastFreezingPrecipitation:" + state.lastFreezingPrecipitation
     
-    if( observation.temp_c > -3 ){
+    calculateSnowMeltScore(observation)
+    caculateNewSnow(observation)
+    
+    if( isMelting(observation) ){
     	state.aboveMeltTemperature = true
-        calculateSnowMeltScore(observation)
     } else {
     	state.aboveMeltTemperature = false		
     }
