@@ -113,7 +113,7 @@ def turnOnPrimaryLightsAndFan(){
         }
     }
     
-    runIn(60*1, turnOnFan)
+    runIn(30, turnOnFan)
   
 }
 
