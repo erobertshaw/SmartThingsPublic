@@ -168,8 +168,7 @@ def recordWeatherStats(observation){
     log.debug "lastPrecipitation:" + state.lastPrecipitation
     
     if( isSnowing(observation) ){
-		//state.lastFreezingPrecipitation = new Date()
-        //state.melt_point_score_since_snow = 0;
+		state.lastFreezingPrecipitation = new Date()
     }
     log.debug "lastFreezingPrecipitation:" + state.lastFreezingPrecipitation
     
@@ -187,8 +186,16 @@ def recordWeatherStats(observation){
 
 def setHeatTape(){
 	if(state.snowOnRoof && state.aboveMeltTemperature){
-    	heattape.on()
+        heattape.each { 
+            if( it.currentValue("switch") != "on"){
+                it.on()
+            }
+        }
     }else{
-    	heattape.off()
+    	 heattape.each { 
+            if( it.currentValue("switch") == "on"){
+                it.off()
+            }
+        }
     }
 }
