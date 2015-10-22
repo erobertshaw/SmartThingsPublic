@@ -104,7 +104,9 @@ def turnOffFan(){
 }
 
 def turnOnPrimaryLightsAndFan(){
+	
 	state.occupied = true
+    log.debug "Turn on lights"
 	primaryLights.each { 
     	log.debug it
     	log.debug it.currentValue("switch")
@@ -113,11 +115,12 @@ def turnOnPrimaryLightsAndFan(){
         }
     }
     
-    runIn(30, turnOnFan)
+    turnOnFan()
   
 }
 
 def turnOnFan(){
+  log.debug "Turn on fan"
   primaryFan.each { 
   	if( it.currentValue("switch") != "on"){
     	it.on()
