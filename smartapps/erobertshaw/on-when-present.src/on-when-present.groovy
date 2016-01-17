@@ -1,5 +1,4 @@
-/**
- *  Outside lights based on motion sensor
+ /*  Outside lights based on motion sensor
  *
  *  Copyright 2015 Aperations.com llc
  *
@@ -14,21 +13,21 @@
  *
  */
 definition(
-    name: "Outside lights based on motion sensor",
+    name: "On when present",
     namespace: "erobertshaw",
     author: "Aperations.com llc",
-    description: "Controls outside lights. Considers time of day for light and motion from sensors.",
+    description: "Turn on lights when ever sensors detect presence",
     category: "Convenience",
     iconUrl: "https://s3.amazonaws.com/smartapp-icons/Convenience/Cat-Convenience.png",
     iconX2Url: "https://s3.amazonaws.com/smartapp-icons/Convenience/Cat-Convenience@2x.png",
     iconX3Url: "https://s3.amazonaws.com/smartapp-icons/Convenience/Cat-Convenience@2x.png")
 
 
+
 preferences {
     section("Outside devices") {
         input "primaryLights", "capability.switch", multiple: true, required: true ,  title: "Primary lights"
     	input "primarySensor", "capability.motionSensor", multiple: true, required: true ,  title: "Primary Motion Sensor"
-        input "lightSensor", "capability.illuminanceMeasurement", required: true ,  title: "Light level Sensor"
     }
 }
 
@@ -93,9 +92,6 @@ def turnOffPrimaryLights(){
 
 
 def turnOnPrimaryLights(){
-	def lightLevel=lightSensor.currentValue("illuminance")
-	log.debug "light level (LUX): $lightLevel"
-	//if( lightLevel > 5) return;
 	state.occupied = true
 	primaryLights.each { 
     	log.debug it

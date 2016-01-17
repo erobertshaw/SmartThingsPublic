@@ -27,8 +27,10 @@ definition(
 preferences {
     section("Main room sensor") {
         input "primaryLights", "capability.switch", multiple: true, required: true ,  title: "Primary lights"
-        input "primaryFan", "capability.switch", multiple: true, required: true ,  title: "Primary Fan"
+        input "showerLights", "capability.switch", multiple: true, required: false ,  title: "Shower lights"
+        input "primaryFan", "capability.switch", multiple: true, required: false ,  title: "Primary Fan"
     	input "primarySensor", "capability.motionSensor", multiple: true, required: true ,  title: "Primary Sensor"
+        input "showerSensor", "capability.motionSensor", multiple: true, required: false ,  title: "Shower Sensor"
     }
 }
 
@@ -48,14 +50,14 @@ def updated() {
 def initialize() {    
     state.occupied = false 
     subscribe(primarySensor, "motion", primaryMotionDetected)
+	subscribe(showerSensor, "motion", showerMotionDetected)
 }
+
 
 def primaryMotionDetected(evt) {
   if("active" == evt.value) {
-    log.debug "active"
-    
+    log.debug "active" 
     turnOnPrimaryLightsAndFan()
-    
   } else if("inactive" == evt.value) {
     log.debug "inactive"
     Boolean lastInactive = true;
@@ -69,14 +71,37 @@ def primaryMotionDetected(evt) {
   log.debug "Bathroom is occupied: " + state.occupied
 }
 
+def showerMotionDetected(evt) {
+  if("active" == evt.value) {
+    log.debug "shower active" 
+    turnOnShowerLightsAndFan()
+  } else if("inactive" == evt.value) {
+    log.debug "shower inactive"
+    Boolean lastShowerInactive = true;
+    showerSensor.each { 
+    	if( it.currentValue("motion") == "active"){
+        	lastShowerInactive = false;
+        }
+    }
+    if(lastShowerInactive) lastShowerSensorInactive();
+  }
+  log.debug "Shower is occupied: " + state.occupied
+}
+
 def lastPrimarySensorInactive(){
 	log.debug "Last primary sensor went inactive"
     state.occupied = false
     runIn(60*1, turnOffPrimaryLightsAndFan)
 }
 
+def lastShowerSensorInactive(){
+	log.debug "Last shower sensor went inactive"
+    state.showerOccupied = false
+    runIn(60*1, turnOffShowerLightsAndFan)
+}
+
 def turnOffPrimaryLightsAndFan(){
-	if(state.occupied){
+	if(state.occupied || state.showerOccupied){
     	// if sensors re occupied the room - don't turn the lights and fan off :)
         return;
     }
@@ -87,12 +112,29 @@ def turnOffPrimaryLightsAndFan(){
         }
     }
  
+ 	if(!state.showerOccupied){
+    	runIn(60*3, turnOffFan)
+    }
+}
+
+def turnOffShowerLightsAndFan(){
+	if(state.showerOccupied){
+    	// if sensors re occupied the room - don't turn the lights and fan off :)
+        return;
+    }
+    
+	showerLights.each { 
+    	if( it.currentValue("switch") == "on"){
+        	it.off()
+        }
+    }
+ 
     runIn(60*9, turnOffFan)
 }
 
 
 def turnOffFan(){
-	if(state.occupied){
+	if(state.occupied || state.showerOccupied){
     	// if sensors re occupied the room - don't turn the lights and fan off :)
         return;
     }
@@ -117,6 +159,19 @@ def turnOnPrimaryLightsAndFan(){
     
     turnOnFan()
   
+}
+
+def turnOnShowerLightsAndFan(){
+	state.showerOccupied = true
+    log.debug "Turn on shower lights"
+	showerLights.each { 
+    	log.debug it
+    	log.debug it.currentValue("switch")
+    	if( it.currentValue("switch") != "on"){
+        	it.on()
+        }
+    }
+    turnOnFan()
 }
 
 def turnOnFan(){
